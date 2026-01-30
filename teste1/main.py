@@ -55,3 +55,30 @@ def process_statements(df, quarter: str, year: int):
     grouped_df.insert(2, 'Ano', year)
 
     return grouped_df
+
+def download_registry_data():
+    url = "https://dadosabertos.ans.gov.br/FTP/PDA/operadoras_de_plano_de_saude_ativas/Relatorio_cadop.csv"
+
+    print(f"Baixando arquivo de cadastro de operadoras de {url}")
+
+    try:
+        response = requests.get(url, timeout=30)
+        response.raise_for_status()
+
+        print("Download do arquivo concluído!")
+        
+        csv_file = BytesIO(response.content)
+
+        registry_df = pd.read_csv(csv_file, delimiter=';', decimal=',', encoding='utf-8')
+        registry_df.columns = registry_df.columns.str.upper()
+        registry_df = registry_df[['CNPJ', 'REGISTRO_OPERADORA', 'RAZAO_SOCIAL']]
+        registry_df = registry_df.rename(columns={'REGISTRO_OPERADORA': 'REG_ANS', 'RAZAO_SOCIAL': 'RazaoSocial'})
+        registry_df['CNPJ'] = registry_df['CNPJ'].astype(str).str.zfill(14)
+
+        return registry_df
+    except requests.exceptions.HTTPError as e:
+        print(f"Erro HTTP ao baixar arquivo: {e}")
+        return None
+    except requests.exceptions.RequestException as e:
+        print(f"Erro de conexão ao baixar arquivo: {e}")
+        return None
