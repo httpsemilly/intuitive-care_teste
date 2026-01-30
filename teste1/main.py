@@ -40,3 +40,18 @@ def extract_zip(zip_content: bytes):
         df = pd.read_csv(csv_buffer, delimiter=';', decimal=',', encoding='utf-8')
 
         return df
+    
+def process_statements(df, quarter: str, year: int):
+    """Filtra e processa demonstrações contábeis, focando em despesas com eventos/sinistros. Retorna DataFrame"""
+
+    pattern = r'^DESPESAS\s+COM\s+EVENTOS\s*/\s*SINISTROS'
+    filtered_df = df[df['DESCRICAO'].str.contains(pattern, case=False, na=False, regex=True)]
+    
+    selected_df = filtered_df[['REG_ANS', 'VL_SALDO_FINAL']]
+
+    grouped_df = selected_df.groupby('REG_ANS').sum().reset_index()
+    grouped_df.rename(columns={'VL_SALDO_FINAL': 'ValorDespesas'}, inplace=True)
+    grouped_df.insert(1, 'Trimestre', quarter)
+    grouped_df.insert(2, 'Ano', year)
+
+    return grouped_df
