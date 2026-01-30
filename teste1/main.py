@@ -82,3 +82,9 @@ def download_registry_data():
     except requests.exceptions.RequestException as e:
         print(f"Erro de conexão ao baixar arquivo: {e}")
         return None
+
+def merge_with_operator_info(grouped_df, registry_df):
+    processed_df = grouped_df.merge(registry_df[['REG_ANS', 'CNPJ', 'RazaoSocial']], on='REG_ANS', how='left')
+    processed_df = processed_df[['CNPJ', 'RazaoSocial', 'Trimestre', 'Ano', 'ValorDespesas']]
+
+    return processed_df
