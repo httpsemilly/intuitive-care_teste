@@ -2,6 +2,7 @@
 import zipfile
 import pandas as pd
 from io import BytesIO
+import os
 
 def download_file(url: str):
     """Baixa arquivo ZIP da URL e retorna o conteúdo em bytes"""
@@ -88,3 +89,92 @@ def merge_with_operator_info(grouped_df, registry_df):
     processed_df = processed_df[['CNPJ', 'RazaoSocial', 'Trimestre', 'Ano', 'ValorDespesas']]
 
     return processed_df
+
+def main():
+    """Orquestra todo o processo de download, processamento e consolidação dos dados das demonstrações contábeis da ANS."""
+    
+    os.makedirs('outputs', exist_ok=True)
+
+    dataframes = []
+    
+    quarters = [
+        {'ano': 2025, 'trimestre': '1T'},
+        {'ano': 2025, 'trimestre': '2T'},
+        {'ano': 2025, 'trimestre': '3T'}
+    ]
+    
+    for period in quarters:
+        year = period['ano']
+        quarter = period['trimestre']
+        
+        print(f"Processando {quarter}{year}...")
+        url = f"https://dadosabertos.ans.gov.br/FTP/PDA/demonstracoes_contabeis/{year}/{quarter}{year}.zip"
+        
+        zip_content = download_file(url)
+
+        if zip_content is None:
+            print(f"Erro ao baixar {quarter}{year}, pulando...")
+            continue
+        
+        df_quarter = extract_zip(zip_content)
+
+        if df_quarter is None:
+            print(f"Erro ao extrair {quarter}{year}, pulando...")
+            continue
+        
+        processed_df = process_statements(df_quarter, quarter, year)
+        
+        dataframes.append(processed_df)
+        
+        print(f"{quarter}{year} processado.\n")
+
+    if not dataframes:
+        print("ERRO: Nenhum dado foi processado. Verifique as URLs ou conexão.")
+        return
+
+    print("Baixando cadastro de operadoras...")
+    registry_df = download_registry_data()
+    
+    if registry_df is None:
+        print("ERRO: Não foi possível baixar o cadastro de operadoras.")
+        return
+    
+    print(f"Cadastros baixados.\n")
+    
+    print("Concatenando dados de todos os trimestres...\n")
+    consolidated_df = pd.concat(dataframes, ignore_index=True)
+    
+    print("Enriquecendo dados com informações do cadastro...\n")
+    result_df = merge_with_operator_info(consolidated_df, registry_df)
+
+    no_cnpj = result_df['CNPJ'].isna().sum()
+    
+    if no_cnpj > 0:
+        print(f"Aviso: {no_cnpj} registros sem CNPJ (REG_ANS não encontrado no cadastro)\n")
+
+    zeros = result_df[result_df['ValorDespesas'] == 0]
+    print(f"Valores zerados: {len(zeros)}")
+    
+    negative_values = result_df[result_df['ValorDespesas'] < 0]
+    print(f"Valores negativos: {len(negative_values)}")
+    
+    duplicate_values = result_df.groupby('CNPJ').size()
+    duplicate_values = duplicate_values[duplicate_values > 1]
+    print(f"Operadoras em múltiplos trimestres: {len(duplicate_values)}\n")
+    
+    print("Criando arquivo CSV...")
+    csv_path = 'outputs/consolidado_despesas.csv'
+    result_df.to_csv(csv_path, index=False, encoding='utf-8', sep=';', decimal=',', float_format='%.2f')
+    
+    print("Compactando arquivo...")
+    zip_path = 'outputs/consolidado_despesas.zip'
+    
+    with zipfile.ZipFile(zip_path, 'w', zipfile.ZIP_DEFLATED) as zipf:
+        zipf.write(csv_path, arcname='consolidado_despesas.csv')
+    
+    os.remove(csv_path)
+
+    print(f"Arquivo ZIP criado em: {zip_path}\n")
+
+if __name__ == "__main__":
+    main()
