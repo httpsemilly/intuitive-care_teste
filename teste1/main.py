@@ -1,4 +1,4 @@
-import requests
+﻿import requests
 import zipfile
 import pandas as pd
 from io import BytesIO
@@ -6,7 +6,7 @@ from io import BytesIO
 def download_file(url: str):
     """Baixa arquivo ZIP da URL e retorna o conteúdo em bytes"""
 
-    print(f"Baixando arquivo de {url}...")
+    print(f"Baixando arquivo de {url}")
 
     try:
         response = requests.get(url, timeout=30)
