@@ -37,6 +37,6 @@ def extract_zip(zip_content: bytes):
         csv_content = zip.read(csv_filename)
         
         csv_buffer = BytesIO(csv_content)
-        df = pd.read_csv(csv_buffer, delimiter=';', decimal=',')
+        df = pd.read_csv(csv_buffer, delimiter=';', decimal=',', encoding='utf-8')
 
         return df
